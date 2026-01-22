@@ -69,8 +69,23 @@ class Scheduler:
 
     def close(self):
         """Closes the socket and terminates the context."""
-        if hasattr(self, "context"):
-            self.context.term()
+        if hasattr(self, "context") and self.context is not None:
+            try:
+                self.context.term()
+            except Exception as e:
+                logger.warning(f"Error terminating ZMQ context: {e}")
         self.context = None
-        self.mq = None
-        self.result_mq = None
+
+        # Explicitly cleanup MessageQueue resources.
+        # del triggers ShmRingBuffer.__del__ which releases shared memory blocks.
+        if self.mq is not None:
+            del self.mq
+            self.mq = None
+
+        if self.result_mq is not None:
+            del self.result_mq
+            self.result_mq = None
+
+        # Force GC to ensure ShmRingBuffer.__del__ is called promptly
+        import gc
+        gc.collect()

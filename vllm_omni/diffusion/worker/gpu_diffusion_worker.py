@@ -338,6 +338,21 @@ class WorkerProc:
             self.worker.shutdown()
         except Exception as exc:
             logger.warning("Worker %s: Shutdown encountered an error: %s", self.gpu_id, exc)
+
+        # Cleanup MessageQueue resources before ZMQ termination.
+        # del triggers ShmRingBuffer.__del__ which releases shared memory blocks.
+        try:
+            if self.mq is not None:
+                del self.mq
+                self.mq = None
+            if self.result_mq is not None:
+                del self.result_mq
+                self.result_mq = None
+            import gc
+            gc.collect()
+        except Exception as exc:
+            logger.warning("Worker %s: MessageQueue cleanup error: %s", self.gpu_id, exc)
+
         self.context.term()
 
     @staticmethod
